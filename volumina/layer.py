@@ -250,7 +250,7 @@ def dtype_to_range(dsource):
         dtype = dsource.dtype()
     else:
         dtype = numpy.uint8
-    if issubclass(dtype, (int, long, numpy.integer)):
+    if issubclass(dtype, (bool, numpy.bool_, int, long, numpy.integer)):
         range = (0, numpy.iinfo(dtype).max)
     elif (dtype == numpy.float32 or dtype == numpy.float64):
         # Is there a way to get the min and max values of the actual dataset(s)?
