@@ -185,6 +185,7 @@ class Layer( QObject ):
         self._toolTip = ""
         self._cleaned_up = False
 
+        self._updateNumberOfChannels()
         for datasource in filter(None, self._datasources):
             datasource.numberOfChannelsChanged.connect( self._updateNumberOfChannels )
 
@@ -203,12 +204,14 @@ class Layer( QObject ):
         self.contexts = []
 
     def _updateNumberOfChannels(self):
-        newchannels = self._datasources[0].numberOfChannels
-        for datasource in self._datasources[1:]:
-            newchannels = min( datasource.numberOfChannels, newchannels )
-        if newchannels != self.numberOfChannels:
-            # Update property (emits signal)
-            self.numberOfChannels = newchannels
+        if len(self._datasources):
+            newchannels = self._datasources[0].numberOfChannels if self._datasources[0] is not None else 1
+            for datasource in self._datasources[1:]:
+                maybe_newchannels = self._datasources[0].numberOfChannels if self._datasources[0] is not None else 1
+                newchannels = min( maybe_newchannels, newchannels )
+            if newchannels != self.numberOfChannels:
+                # Update property (emits signal)
+                self.numberOfChannels = newchannels
 
     def clean_up(self):
         """

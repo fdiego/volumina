@@ -23,6 +23,8 @@
 import unittest as ut
 import os
 import sys
+import qimage2ndarray
+
 sys.path.append("../.")
 
 #SciPy
@@ -133,6 +135,55 @@ class GrayscaleImageSourceTest( ImageSourcesTestBase ):
         self.ims.setDirty((slice(34,37), slice(12,34)))
         self.ims.isDirty.disconnect( checkDirtyRect )
 
+class GrayscaleImageSourceTest2( ImageSourcesTestBase ):
+    def setUp( self ):
+        super( GrayscaleImageSourceTest2, self ).setUp()
+        self.raw = numpy.load(os.path.join(volumina._testing.__path__[0], 'lena.npy')).astype( numpy.uint32 )
+        self.raw = numpy.ma.masked_array(self.raw, numpy.zeros(self.raw.shape, dtype=bool), shrink=False)
+
+        self.raw[:10, :] = numpy.ma.masked
+        self.raw[-10:, :] = numpy.ma.masked
+        self.raw[:, :10] = numpy.ma.masked
+        self.raw[:, -10:] = numpy.ma.masked
+
+        self.ars = _ArraySource2d(self.raw)
+        self.ims = GrayscaleImageSource( self.ars, GrayscaleLayer( self.ars ))
+
+    def testRequest( self ):
+        imr = self.ims.request(QRect(0,0,512,512))
+        def check(result, codon):
+            self.assertEqual(codon, "unique")
+            self.assertTrue(type(result) == QImage)
+
+            result_array = qimage2ndarray.byte_view(result)
+
+            assert((result_array[:10, :, -1] == 255).all())
+            assert((result_array[-10:, :, -1] == 255).all())
+            assert((result_array[:, :10, -1] == 255).all())
+            assert((result_array[:, -10:, -1] == 255).all())
+
+        imr.notify(check, codon="unique")
+
+    def testSetDirty( self ):
+        def checkAllDirty( rect ):
+            self.assertTrue( rect.isEmpty() )
+
+        def checkDirtyRect( rect ):
+            self.assertEqual( rect.x(), 34 )
+            self.assertEqual( rect.y(), 12 )
+            self.assertEqual( rect.width(), 3 )
+            self.assertEqual( rect.height(), 22  )
+
+        # should mark everything dirty
+        self.ims.isDirty.connect( checkAllDirty )
+        self.ims.setDirty((slice(34,None), slice(12,34)))
+        self.ims.isDirty.disconnect( checkAllDirty )
+
+        # dirty subrect
+        self.ims.isDirty.connect( checkDirtyRect )
+        self.ims.setDirty((slice(34,37), slice(12,34)))
+        self.ims.isDirty.disconnect( checkDirtyRect )
+
 
 #*******************************************************************************
 # C o l o r t a b l e I m a g e S o u r c e T e s t 
@@ -171,6 +222,69 @@ class ColortableImageSourceTest( ImageSourcesTestBase ):
 
                 img.setPixel(i, 4, QColor(0,0,255).rgba())
                 img.setPixel(i, 5, QColor(0,0,255).rgba())
+            assert img.size() == result.size()
+            assert img == result
+
+        imr.notify(check, codon="unique")
+
+    def testSetDirty( self ):
+        def checkAllDirty( rect ):
+            self.assertTrue( rect.isEmpty() )
+
+        def checkDirtyRect( rect ):
+            self.assertEqual( rect.x(), 34 )
+            self.assertEqual( rect.y(), 12 )
+            self.assertEqual( rect.width(), 3 )
+            self.assertEqual( rect.height(), 22  )
+
+        # should mark everything dirty
+        self.ims.isDirty.connect( checkAllDirty )
+        self.ims.setDirty((slice(34,None), slice(12,34)))
+        self.ims.isDirty.disconnect( checkAllDirty )
+
+        # dirty subrect
+        self.ims.isDirty.connect( checkDirtyRect )
+        self.ims.setDirty((slice(34,37), slice(12,34)))
+        self.ims.isDirty.disconnect( checkDirtyRect )
+
+class ColortableImageSourceTest2( ImageSourcesTestBase ):
+    def setUp( self ):
+        if 'TRAVIS' in os.environ:
+            # Colortable requests require vigra, which is not installed on our Travis-CI build.
+            # Skip this test on Travis-CI.
+            import nose
+            raise nose.SkipTest
+
+        super( ColortableImageSourceTest2, self ).setUp()
+        self.seg = numpy.zeros((6,7), dtype=numpy.uint32)
+        self.seg = numpy.ma.masked_array(self.seg, mask=numpy.zeros(self.seg.shape, dtype=bool), shrink=False)
+        self.seg[0:2,:] = 0
+        self.seg[1,:] = numpy.ma.masked
+        self.seg[2:4,:] = 1
+        self.seg[3,:] = numpy.ma.masked
+        self.seg[4:6,:] = 2
+        self.seg[5,:] = numpy.ma.masked
+        self.ars = _ArraySource2d(self.seg)
+        self.ctable = [QColor(255,0,0).rgba(), QColor(0,255,0).rgba(), QColor(0,0,255).rgba()]
+        self.layer = ColortableLayer(self.ars, self.ctable)
+        self.ims = ColortableImageSource( self.ars, self.layer )
+
+    def testRequest( self ):
+        imr = self.ims.request(QRect(0,0,512,512))
+        def check(result, codon):
+            self.assertEqual(codon, "unique")
+            self.assertTrue(type(result) == QImage)
+            img = QImage(7,6, QImage.Format_ARGB32)
+            for i in range(7):
+                img.setPixel(i, 0, QColor(255,0,0,255).rgba())
+                img.setPixel(i, 1, QColor(0,0,0,0).rgba())
+
+                img.setPixel(i, 2, QColor(0,255,0,255).rgba())
+                img.setPixel(i, 3, QColor(0,0,0,0).rgba())
+
+                img.setPixel(i, 4, QColor(0,0,255,255).rgba())
+                img.setPixel(i, 5, QColor(0,0,0,0).rgba())
+
             assert img.size() == result.size()
             assert img == result
 
